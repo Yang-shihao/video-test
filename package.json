@@ -1,0 +1,23 @@
+{
+    "id": "x-video-player",
+    "name": "x-video-player （app h5 微信小程序)",
+    "displayName": "x-video-player （app h5 微信小程序)",
+    "version": "1.0.1",
+    "description": "封装原生video，重写了控制条，包含播放暂停、静音、进度条、倍速菜单、垂直全屏、缓冲Loading、断点播放。",
+    "keywords": [
+        "uniapp",
+        "nvue",
+        "video",
+        "控制条",
+        "倍速播放"
+    ],
+    "dcloudext": {
+        "category": [
+            "前端组件",
+            "通用组件"
+        ]
+    },
+    "dependencies": {
+        "hls.js": "^1.5.20"
+    }
+}
