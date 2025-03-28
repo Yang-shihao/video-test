@@ -1,0 +1,257 @@
+<template>
+	<view class="video-container" :style="{ width:screenWidth ,height:screenHeight }">
+		<video @click="toggleControls" id="videoPlayer" class="video" :src="videoList[videoIndex]" :controls="false"
+			ref="video">
+			<!-- 头部 -->
+			<cover-view class="top-controls" :style="{ width: screenWidth }" :class="{ show: showControls }">
+				<text @click="goBack" class="f14"> 返回</text>
+				<text class="video-title f14">{{ videoTitle }}</text>
+				<text class="f14">分享</text>
+			</cover-view>
+			<!-- 播放 -->
+			<cover-view class="center-controls" :style="{ width: screenWidth , height: screenHeight }"
+				:class="{ hide: isPlaying }">
+				<image class="center-box" @click.stop="togglePlayPause" src="/static/play.png" />
+			</cover-view>
+			<!-- 底部 -->
+			<cover-view class="bottom-controls" :style="{ width: screenWidth,top:screenHeight }"
+				:class="{ show: showControls }">
+				<cover-view class="left">
+					<text class='f14 mr20' @click="prevEpisode">上一集</text>
+					<text class='f14 mr20' @click="togglePlayPause">{{ isPlaying ? "暂停" : "播放" }}</text>
+					<text class='f14 mr20' @click="nextEpisode">下一集</text>
+				</cover-view>
+				<cover-view class="right">
+					<text class='f14 mr20' @click="toggleSpeed">倍速: {{ playbackRate }}x</text>
+					<text class='f14 mr20'>选集</text>
+					<text class='f14' @click="showDanmuSettings">弹幕</text>
+				</cover-view>
+			</cover-view>
+		</video>
+	</view>
+</template>
+
+<script>
+	export default {
+		data() {
+			return {
+				videoTitle: "正在播放：熊出没第一季 第一集",
+				currentTime: 0, // 当前播放时间
+				videoList: [
+					"https://qiniu-web-assets.dcloud.net.cn/unidoc/zh/2minute-demo.mp4",
+					"https://pgcvideo-cdn.xiaodutv.com/1842488843_1473560878_20200812080526.mp4?Cache-Control%3Dmax-age-8640000%26responseExpires%3DFri%2C_20_Nov_2020_08%3A07%3A12_GMT=&xcode=f89b1bff807ec5bf12382d4e442f1e15734e72c933aaa734&sign=1742372665-2472826-0-7bce840c0388e19f66ca1abed50fb6df&time=1742459065&_=1742374749078",
+					"https://pgcvideo-cdn.xiaodutv.com/1676359774_489135743_20220620000946.mp4?Cache-Control%3Dmax-age-8640000%26responseExpires%3DWed%2C_28_Sep_2022_00%3A09%3A58_GMT=&xcode=b580151b50ae3d798af245bc1c5eb7d48cd155e1c29bf9dd&sign=1742372452-7236702-0-101994ffa590cc36a55c57dc5ab266f8&time=1742458852&_=1742374778269",
+				],
+				videoIndex: 0,
+				isPlaying: false,
+				playbackRate: 1.0,
+				speeds: [0.5, 1, 1.25, 1.5, 2], // 支持的倍速选项  
+				currentSpeedIndex: 1, // 当前倍速的索引（默认 1x）
+				screenWidth: 0,
+				screenHeight: 0,
+				showControls: false, // 是否显示播放控制器
+				controlsTimeout: null, // 控制器自动隐藏定时器
+			};
+		},
+
+		onLoad(options) {
+			const {
+				currentTime,
+				videoIndex,
+			} = options
+			this.context = uni.createVideoContext("videoPlayer", this);
+			this.currentTime = currentTime // 当前播放的时间
+			this.videoIndex = videoIndex // 当前播放的视频
+		},
+		onReady() {
+			this.$nextTick(() => {
+				setTimeout(() => {
+					// 设置全屏
+					this.context.requestFullScreen({
+						direction: 90
+					});
+				}, 400)
+				setTimeout(() => {
+					uni.getSystemInfo({
+						success: (res) => {
+							console.log(`宽度：${res.windowWidth}---高度：${res.windowHeight}`);
+							this.screenWidth = res.windowWidth + 'px';
+							this.screenHeight = res.windowHeight + 'px';
+						},
+						complete: () => {
+							this.setPlayPause(true, this.currentTime) // 自动播放
+							this.toggleControls()
+						}
+					})
+				}, 1000)
+			})
+		},
+		onHide() {
+			this.setPlayPause() // 退出暂停
+		},
+		methods: {
+			// 监听屏幕点击，显示/隐藏控制栏
+			toggleControls() {
+				// 取消之前的隐藏定时器
+				if (this.controlsTimeout) clearTimeout(this.controlsTimeout);
+
+				// 显示控件
+				this.showControls = true;
+
+				// 3 秒后自动隐藏
+				// this.controlsTimeout = setTimeout(() => {
+				// 	this.showControls = false;
+				// }, 2000);
+			},
+			// 返回
+			goBack() {
+				this.context.exitFullScreen(); // 退出全屏
+				uni.navigateBack(); // 返回
+			},
+			// 按钮切换播放/暂停
+			togglePlayPause() {
+				if (this.isPlaying) {
+					this.context.pause(); // 暂停
+				} else {
+					this.context.play(); // 播放
+				}
+				this.isPlaying = !this.isPlaying;
+			},
+			// 主动设置播放/暂停
+			setPlayPause(status = false, playTime = 0) {
+				if (!status) {
+					this.context.pause(); // 暂停
+				} else {
+					if (playTime) this.context.seek(playTime); // 跳转到指定时间
+					this.context.play(); // 播放
+				}
+				this.isPlaying = status
+			},
+			toggleSpeed() {
+				// 切换到下一个倍速
+				this.currentSpeedIndex = (this.currentSpeedIndex + 1) % this.speeds.length;
+				this.playbackRate = this.speeds[this.currentSpeedIndex];
+
+				// 更新视频播放速度
+				this.context.playbackRate(this.playbackRate);
+			},
+			toggleRatio() {
+				// 实现比例切换逻辑
+			},
+			prevEpisode() {
+				this.videoIndex++;
+				if (this.videoIndex > 2) this.videoIndex = 0;
+				this.$nextTick(() => {
+					this.context.play(); // 播放
+					this.isPlaying = true;
+				});
+			},
+			nextEpisode() {
+				this.videoIndex--;
+				if (this.videoIndex < 0) this.videoIndex = 2;
+				this.$nextTick(() => {
+					this.context.play(); // 播放
+					this.isPlaying = true;
+				});
+			},
+			showDanmuSettings() {
+				// this.$refs.danmuPopup.open();
+			},
+		},
+	};
+</script>
+
+<style>
+	.video-container {}
+
+	.top-controls,
+	.bottom-controls {
+		opacity: 0;
+		transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+	}
+
+	.top-controls {
+		transform: translateY(-100%);
+	}
+
+	.bottom-controls {
+		transform: translateY(100%);
+	}
+
+	/* 显示时的状态 */
+	.show {
+		opacity: 1;
+		transform: translateY(0);
+	}
+
+	.hide {
+		opacity: 0;
+		display: none;
+	}
+
+	.top-controls {
+		position: absolute;
+		top: 0;
+		left: 0;
+		display: flex;
+		flex-direction: row !important;
+		justify-content: center;
+		/* 改为 center */
+		align-items: center;
+		background: rgba(0, 0, 0, 0.5);
+		color: white;
+		height: 60px;
+		padding: 0 15px;
+	}
+
+	.video-title {
+		flex: 1;
+		/* 占据剩余空间 */
+		text-align: center;
+		/* 文本水平居中 */
+	}
+
+	.f14 {
+		font-size: 16px;
+		color: #fff;
+	}
+
+	.center-controls {
+		display: flex;
+		flex-direction: row !important;
+		justify-content: center;
+		/* 改为 center */
+		align-items: center;
+		/* background: rgba(0, 0, 0, 0.5); */
+
+	}
+
+	.center-box {
+		color: #fff;
+		width: 50px;
+		height: 50px;
+	}
+
+	.bottom-controls {
+		position: absolute;
+		left: 0;
+		display: flex;
+		flex-direction: row !important;
+		justify-content: space-between;
+		align-items: center;
+		height: 60px;
+		padding: 0 15px;
+		background: rgba(0, 0, 0, 0.5);
+	}
+
+	.left,
+	.right {
+		display: flex;
+		flex-direction: row !important;
+		align-items: center;
+	}
+
+	.mr20 {
+		margin-right: 20px;
+	}
+</style>
